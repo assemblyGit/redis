@@ -280,7 +280,7 @@ typedef struct RedisModuleCommandFilterCtx {
 typedef void (*RedisModuleCommandFilterFunc) (RedisModuleCommandFilterCtx *filter);
 
 typedef struct RedisModuleCommandFilter {
-    /* The module that registered the filter */
+    /* The module that registered the filter 注册filter的module*/
     RedisModule *module;
     /* Filter callback function */
     RedisModuleCommandFilterFunc callback;
@@ -4936,7 +4936,7 @@ void moduleCallCommandFilters(client *c) {
         f->callback(&filter);
     }
 
-    c->argv = filter.argv;
+    c->argv = filter.argv;//返回拦截后的参数和数量
     c->argc = filter.argc;
 }
 

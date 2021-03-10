@@ -65,8 +65,8 @@ aeEventLoop *aeCreateEventLoop(int setsize) {
     int i;
 
     if ((eventLoop = zmalloc(sizeof(*eventLoop))) == NULL) goto err;
-    eventLoop->events = zmalloc(sizeof(aeFileEvent)*setsize);
-    eventLoop->fired = zmalloc(sizeof(aeFiredEvent)*setsize);
+    eventLoop->events = zmalloc(sizeof(aeFileEvent)*setsize);//分配fd事件对象
+    eventLoop->fired = zmalloc(sizeof(aeFiredEvent)*setsize);//触发的事件对象
     if (eventLoop->events == NULL || eventLoop->fired == NULL) goto err;
     eventLoop->setsize = setsize;
     eventLoop->lastTime = time(NULL);
@@ -142,14 +142,14 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     }
     aeFileEvent *fe = &eventLoop->events[fd];
 
-    if (aeApiAddEvent(eventLoop, fd, mask) == -1)
+    if (aeApiAddEvent(eventLoop, fd, mask) == -1)  //调用底层具体实现
         return AE_ERR;
     fe->mask |= mask;
-    if (mask & AE_READABLE) fe->rfileProc = proc;
-    if (mask & AE_WRITABLE) fe->wfileProc = proc;
+    if (mask & AE_READABLE) fe->rfileProc = proc;//读回掉
+    if (mask & AE_WRITABLE) fe->wfileProc = proc;//写回掉
     fe->clientData = clientData;
     if (fd > eventLoop->maxfd)
-        eventLoop->maxfd = fd;
+        eventLoop->maxfd = fd;//更新eventLoop最大的fd
     return AE_OK;
 }
 
@@ -204,7 +204,7 @@ static void aeAddMillisecondsToNow(long long milliseconds, long *sec, long *ms) 
     *sec = when_sec;
     *ms = when_ms;
 }
-
+/**milliseconds 初次执行延迟事件*/
 long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
         aeTimeProc *proc, void *clientData,
         aeEventFinalizerProc *finalizerProc)
@@ -215,7 +215,7 @@ long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
     te = zmalloc(sizeof(*te));
     if (te == NULL) return AE_ERR;
     te->id = id;
-    aeAddMillisecondsToNow(milliseconds,&te->when_sec,&te->when_ms);
+    aeAddMillisecondsToNow(milliseconds,&te->when_sec,&te->when_ms);//下次执行时间
     te->timeProc = proc;
     te->finalizerProc = finalizerProc;
     te->clientData = clientData;
@@ -276,13 +276,13 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
     /* If the system clock is moved to the future, and then set back to the
      * right value, time events may be delayed in a random way. Often this
      * means that scheduled operations will not be performed soon enough.
-     *
+     *     
      * Here we try to detect system clock skews, and force all the time
      * events to be processed ASAP when this happens: the idea is that
      * processing events earlier is less dangerous than delaying them
      * indefinitely, and practice suggests it is. */
-    if (now < eventLoop->lastTime) {
-        te = eventLoop->timeEventHead;
+    if (now < eventLoop->lastTime) {//当前时间小于最后触发时间,表示系统时间发生偏移
+        te = eventLoop->timeEventHead;//立即处理所有时间事件
         while(te) {
             te->when_sec = 0;
             te = te->next;
@@ -321,18 +321,18 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
             te = te->next;
             continue;
         }
-        aeGetTime(&now_sec, &now_ms);
+        aeGetTime(&now_sec, &now_ms);//获取秒数和微秒数
         if (now_sec > te->when_sec ||
-            (now_sec == te->when_sec && now_ms >= te->when_ms))
+            (now_sec == te->when_sec && now_ms >= te->when_ms))//当前时间大于事件的执行时间
         {
             int retval;
 
             id = te->id;
-            retval = te->timeProc(eventLoop, id, te->clientData);
+            retval = te->timeProc(eventLoop, id, te->clientData);//
             processed++;
             if (retval != AE_NOMORE) {
-                aeAddMillisecondsToNow(retval,&te->when_sec,&te->when_ms);
-            } else {
+                aeAddMillisecondsToNow(retval,&te->when_sec,&te->when_ms);//返回下次执行的间隔
+            } else {//事件不需要继续
                 te->id = AE_DELETED_EVENT_ID;
             }
         }
@@ -346,12 +346,12 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
  * Without special flags the function sleeps until some file event
  * fires, or when the next time event occurs (if any).
  *
- * If flags is 0, the function does nothing and returns.
+ * If flags is 0, the function does nothing and returns. 如果flag为0,该函数不处理返回
  * if flags has AE_ALL_EVENTS set, all the kind of events are processed.
- * if flags has AE_FILE_EVENTS set, file events are processed.
+ * if flags has AE_FILE_EVENTS set, file events are processed. file_event
  * if flags has AE_TIME_EVENTS set, time events are processed.
- * if flags has AE_DONT_WAIT set the function returns ASAP until all
- * if flags has AE_CALL_AFTER_SLEEP set, the aftersleep callback is called.
+ * if flags has AE_DONT_WAIT set the function returns ASAP until all  poll时无阻塞时间
+ * if flags has AE_CALL_AFTER_SLEEP set, the aftersleep callback is called.  poll后调用该回调
  * the events that's possible to process without to wait are processed.
  *
  * The function returns the number of events processed. */
@@ -366,15 +366,15 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
      * file events to process as long as we want to process time
      * events, in order to sleep until the next time event is ready
      * to fire. */
-    if (eventLoop->maxfd != -1 ||
-        ((flags & AE_TIME_EVENTS) && !(flags & AE_DONT_WAIT))) {
+    if (eventLoop->maxfd != -1 ||   //有注册事件
+        ((flags & AE_TIME_EVENTS) && !(flags & AE_DONT_WAIT))) {//时间事件且AE_DONT_WAIT 未设置
         int j;
         aeTimeEvent *shortest = NULL;
         struct timeval tv, *tvp;
 
         if (flags & AE_TIME_EVENTS && !(flags & AE_DONT_WAIT))
-            shortest = aeSearchNearestTimer(eventLoop);
-        if (shortest) {
+            shortest = aeSearchNearestTimer(eventLoop);//为了计算poll可阻塞的时间
+        if (shortest) {//time事件
             long now_sec, now_ms;
 
             aeGetTime(&now_sec, &now_ms);
@@ -386,36 +386,36 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 (shortest->when_sec - now_sec)*1000 +
                 shortest->when_ms - now_ms;
 
-            if (ms > 0) {
-                tvp->tv_sec = ms/1000;
-                tvp->tv_usec = (ms % 1000)*1000;
+            if (ms > 0) {//等待时间 >0 需要等待
+                tvp->tv_sec = ms/1000;  //等待的秒
+                tvp->tv_usec = (ms % 1000)*1000;//等待的微秒
             } else {
                 tvp->tv_sec = 0;
                 tvp->tv_usec = 0;
             }
-        } else {
+        } else {//如果不存在时间事件
             /* If we have to check for events but need to return
              * ASAP because of AE_DONT_WAIT we need to set the timeout
              * to zero */
-            if (flags & AE_DONT_WAIT) {
+            if (flags & AE_DONT_WAIT) {//如果不等待
                 tv.tv_sec = tv.tv_usec = 0;
                 tvp = &tv;
-            } else {
+            } else {//可以等待
                 /* Otherwise we can block */
                 tvp = NULL; /* wait forever */
             }
         }
 
         /* Call the multiplexing API, will return only on timeout or when
-         * some event fires. */
+         * some event fires. 调用多路服用api*/
         numevents = aeApiPoll(eventLoop, tvp);
 
         /* After sleep callback. */
         if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)
             eventLoop->aftersleep(eventLoop);
 
-        for (j = 0; j < numevents; j++) {
-            aeFileEvent *fe = &eventLoop->events[eventLoop->fired[j].fd];
+        for (j = 0; j < numevents; j++) {//
+            aeFileEvent *fe = &eventLoop->events[eventLoop->fired[j].fd];//
             int mask = eventLoop->fired[j].mask;
             int fd = eventLoop->fired[j].fd;
             int fired = 0; /* Number of events fired for current fd. */
@@ -465,7 +465,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         }
     }
     /* Check time events */
-    if (flags & AE_TIME_EVENTS)
+    if (flags & AE_TIME_EVENTS)//如果存在时间事件
         processed += processTimeEvents(eventLoop);
 
     return processed; /* return the number of processed file/time events */
@@ -482,7 +482,7 @@ int aeWait(int fd, int mask, long long milliseconds) {
     if (mask & AE_READABLE) pfd.events |= POLLIN;
     if (mask & AE_WRITABLE) pfd.events |= POLLOUT;
 
-    if ((retval = poll(&pfd, 1, milliseconds))== 1) {
+    if ((retval = poll(&pfd, 1, milliseconds))== 1) {//轮询
         if (pfd.revents & POLLIN) retmask |= AE_READABLE;
         if (pfd.revents & POLLOUT) retmask |= AE_WRITABLE;
         if (pfd.revents & POLLERR) retmask |= AE_WRITABLE;
@@ -495,7 +495,7 @@ int aeWait(int fd, int mask, long long milliseconds) {
 
 void aeMain(aeEventLoop *eventLoop) {
     eventLoop->stop = 0;
-    while (!eventLoop->stop) {
+    while (!eventLoop->stop) {//事件循环
         if (eventLoop->beforesleep != NULL)
             eventLoop->beforesleep(eventLoop);
         aeProcessEvents(eventLoop, AE_ALL_EVENTS|AE_CALL_AFTER_SLEEP);

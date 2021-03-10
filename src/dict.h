@@ -68,7 +68,7 @@ typedef struct dictType {
  * implement incremental rehashing, for the old to the new table. */
 typedef struct dictht {
     dictEntry **table;
-    unsigned long size;
+    unsigned long size;//桶的大小
     unsigned long sizemask;
     unsigned long used;
 } dictht;
@@ -78,7 +78,7 @@ typedef struct dict {
     void *privdata;
     dictht ht[2];
     long rehashidx; /* rehashing not in progress if rehashidx == -1 */
-    unsigned long iterators; /* number of iterators currently running */
+    unsigned long iterators; /* number of iterators currently running 迭代器,有迭代器不能rehash*/
 } dict;
 
 /* If safe is set to 1 this is a safe iterator, that means, you can call

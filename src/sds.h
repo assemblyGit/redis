@@ -34,7 +34,7 @@
 #define __SDS_H
 
 #define SDS_MAX_PREALLOC (1024*1024)
-const char *SDS_NOINIT;
+const char *SDS_NOINIT;//不用该值初始化字符串内容,即不会复制到sds对象中
 
 #include <sys/types.h>
 #include <stdarg.h>
@@ -43,7 +43,7 @@ const char *SDS_NOINIT;
 typedef char *sds;
 
 /* Note: sdshdr5 is never used, we just access the flags byte directly.
- * However is here to document the layout of type 5 SDS strings. */
+ * However is here to document the layout of type 5 SDS strings. __attribute__ ((__packed__)) 取消对齐*/
 struct __attribute__ ((__packed__)) sdshdr5 {
     unsigned char flags; /* 3 lsb of type, and 5 msb of string length */
     char buf[];

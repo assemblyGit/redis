@@ -62,8 +62,8 @@ robj *lookupKey(redisDb *db, robj *key, int flags) {
          * a copy on write madness. */
         if (server.rdb_child_pid == -1 &&
             server.aof_child_pid == -1 &&
-            !(flags & LOOKUP_NOTOUCH))
-        {
+            !(flags & LOOKUP_NOTOUCH))// 确保不存在bgsave 和 aof write子进程
+        {// 访问key 步touch
             if (server.maxmemory_policy & MAXMEMORY_FLAG_LFU) {
                 updateLFU(val);
             } else {
@@ -271,9 +271,9 @@ robj *dbRandomKey(redisDb *db) {
 int dbSyncDelete(redisDb *db, robj *key) {
     /* Deleting an entry from the expires dict will not free the sds of
      * the key, because it is shared with the main dictionary. */
-    if (dictSize(db->expires) > 0) dictDelete(db->expires,key->ptr);
-    if (dictDelete(db->dict,key->ptr) == DICT_OK) {
-        if (server.cluster_enabled) slotToKeyDel(key);
+    if (dictSize(db->expires) > 0) dictDelete(db->expires,key->ptr);//先从过期dict中删除
+    if (dictDelete(db->dict,key->ptr) == DICT_OK) {//在删除key
+        if (server.cluster_enabled) slotToKeyDel(key);//集群
         return 1;
     } else {
         return 0;
@@ -1102,7 +1102,7 @@ long long getExpire(redisDb *db, robj *key) {
     return dictGetSignedIntegerVal(de);
 }
 
-/* Propagate expires into slaves and the AOF file.
+/* Propagate expires into slaves and the AOF file.   传递过期信息到slave和AOF文件,当key在master中过期，该key的del操作被发送slave和AOF文件
  * When a key expires in the master, a DEL operation for this key is sent
  * to all the slaves and the AOF file if enabled.
  *

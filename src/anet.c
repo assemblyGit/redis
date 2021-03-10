@@ -473,19 +473,19 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
     hints.ai_family = af;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;    /* No effect if bindaddr != NULL */
-
-    if ((rv = getaddrinfo(bindaddr,_port,&hints,&servinfo)) != 0) {
-        anetSetError(err, "%s", gai_strerror(rv));
+    //hints 决定getaddrinfo 返回的ai_family, ai_socktype, and ai_protocol 这三个字段
+    if ((rv = getaddrinfo(bindaddr,_port,&hints,&servinfo)) != 0) {//系统调用,返回0表示成功
+        anetSetError(err, "%s", gai_strerror(rv));//AI_PASSIVE 如果bindaddr 为空,会返回合适的地址（包含wildcard address）用于bind和接收连接
         return ANET_ERR;
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)//socket方法返回fd
             continue;
 
         if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) goto error;
         if (anetSetReuseAddr(err,s) == ANET_ERR) goto error;
         if (anetListen(err,s,p->ai_addr,p->ai_addrlen,backlog) == ANET_ERR) s = ANET_ERR;
-        goto end;
+        goto end;//bind成功一个就返回
     }
     if (p == NULL) {
         anetSetError(err, "unable to bind socket, errno: %d", errno);

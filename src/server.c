@@ -78,7 +78,7 @@ volatile unsigned long lru_clock; /* Server global current LRU time. */
  *
  * name: a string representing the command name.
  * function: pointer to the C function implementing the command.
- * arity: number of arguments, it is possible to use -N to say >= N
+ * arity: number of arguments, it is possible to use -N to say >= N   
  * sflags: command flags as string. See below for a table of flags.
  * flags: flags as bitmask. Computed by Redis using the 'sflags' field.
  * get_keys_proc: an optional function to get key arguments from a command.
@@ -115,7 +115,7 @@ volatile unsigned long lru_clock; /* Server global current LRU time. */
  * l: Allow command while loading the database.
  * t: Allow command while a slave has stale data but is not allowed to
  *    server this data. Normally no command is accepted in this condition
- *    but just a few.
+ *    but just a few.  当slave有旧数据,而不允许为当前数据服务,允许slave执行命令
  * M: Do not automatically propagate the command on MONITOR.
  * k: Perform an implicit ASKING for this command, so the command will be
  *    accepted in cluster mode if the slot is marked as 'importing'.
@@ -441,7 +441,7 @@ mstime_t mstime(void) {
 /* After an RDB dump or AOF rewrite we exit from children using _exit() instead of
  * exit(), because the latter may interact with the same file objects used by
  * the parent process. However if we are testing the coverage normal exit() is
- * used in order to obtain the right coverage information. */
+ * used in order to obtain the right coverage information. 在RDBdump或者AOF rewrite之后从子进程退出*/
 void exitFromChild(int retcode) {
 #ifdef COVERAGE_TEST
     exit(retcode);
@@ -811,7 +811,7 @@ long long getInstantaneousMetric(int metric) {
 /* Check for timeouts. Returns non-zero if the client was terminated.
  * The function gets the current time in milliseconds as argument since
  * it gets called multiple times in a loop, so calling gettimeofday() for
- * each iteration would be costly without any actual gain. */
+ * each iteration would be costly without any actual gain. 检查超时,如果有client被终结,返回非0,*/
 int clientsCronHandleTimeout(client *c, mstime_t now_ms) {
     time_t now = now_ms/1000;
 
@@ -825,7 +825,7 @@ int clientsCronHandleTimeout(client *c, mstime_t now_ms) {
         serverLog(LL_VERBOSE,"Closing idle client");
         freeClient(c);
         return 1;
-    } else if (c->flags & CLIENT_BLOCKED) {
+    } else if (c->flags & CLIENT_BLOCKED) {//client blocked
         /* Blocked OPS timeout is handled with milliseconds resolution.
          * However note that the actual resolution is limited by
          * server.hz. */
@@ -1218,15 +1218,15 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
         rewriteAppendOnlyFileBackground();
     }
 
-    /* Check if a background saving or AOF rewrite in progress terminated. */
+    /* Check if a background saving or AOF rewrite in progress terminated. 检查是否存在子进程*/
     if (server.rdb_child_pid != -1 || server.aof_child_pid != -1 ||
         ldbPendingChildren())
     {
         int statloc;
         pid_t pid;
 
-        if ((pid = wait3(&statloc,WNOHANG,NULL)) != 0) {
-            int exitcode = WEXITSTATUS(statloc);
+        if ((pid = wait3(&statloc,WNOHANG,NULL)) != 0) {//等待任何子进程处理[https://linux.die.net/man/2/wait3]
+            int exitcode = WEXITSTATUS(statloc);//WNOHANG 如果没有子进程退出,立即返回,返回状态发生变更的child pid
             int bysignal = 0;
 
             if (WIFSIGNALED(statloc)) bysignal = WTERMSIG(statloc);
@@ -1288,7 +1288,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
             long long base = server.aof_rewrite_base_size ?
                 server.aof_rewrite_base_size : 1;
             long long growth = (server.aof_current_size*100/base) - 100;
-            if (growth >= server.aof_rewrite_perc) {
+            if (growth >= server.aof_rewrite_perc) {//增长率
                 serverLog(LL_NOTICE,"Starting automatic rewriting of AOF on %lld%% growth",growth);
                 rewriteAppendOnlyFileBackground();
             }
@@ -1304,7 +1304,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
      * clear the AOF error in case of success to make the DB writable again,
      * however to try every second is enough in case of 'hz' is set to
      * an higher frequency. */
-    run_with_period(1000) {
+    run_with_period(1000) {//每隔一秒 刷新一次AOF
         if (server.aof_last_write_status == C_ERR)
             flushAppendOnlyFile(0);
     }
@@ -1334,9 +1334,9 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
 
     /* Start a scheduled BGSAVE if the corresponding flag is set. This is
      * useful when we are forced to postpone a BGSAVE because an AOF
-     * rewrite is in progress.
-     *
-     * Note: this code must be after the replicationCron() call above so
+     * rewrite is in progress.    根据设置的flag,启动预定的BGSAVE,这对因为AOF rewrite在进行中而推迟的BGSAVE很有用
+     *    该代码必须在上面的replicationCron() 调用之后
+     * Note: this code must be after the replicationCron() call above so 
      * make sure when refactoring this file to keep this order. This is useful
      * because we want to give priority to RDB savings for replication. */
     if (server.rdb_child_pid == -1 && server.aof_child_pid == -1 &&
@@ -1351,7 +1351,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     }
 
     server.cronloops++;
-    return 1000/server.hz;
+    return 1000/server.hz;//返回下次调用间隔
 }
 
 /* This function gets called every time Redis is entering the
@@ -1402,8 +1402,8 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
     /* Write the AOF buffer on disk */
     flushAppendOnlyFile(0);
 
-    /* Handle writes with pending output buffers. */
-    handleClientsWithPendingWrites();
+    /* Handle writes with pending output buffers. 处理写入*/
+    handleClientsWithPendingWrites();//处理写事件
 
     /* Before we are going to sleep, let the threads access the dataset by
      * releasing the GIL. Redis main thread will not touch anything at this
@@ -1919,10 +1919,10 @@ int listenToPort(int port, int *fds, int *count) {
      * entering the loop if j == 0. */
     if (server.bindaddr_count == 0) server.bindaddr[0] = NULL;
     for (j = 0; j < server.bindaddr_count || j == 0; j++) {
-        if (server.bindaddr[j] == NULL) {
+        if (server.bindaddr[j] == NULL) {//如果没有指定地址
             int unsupported = 0;
             /* Bind * for both IPv6 and IPv4, we enter here only if
-             * server.bindaddr_count == 0. */
+             * server.bindaddr_count == 0. 为IPv6和v4绑定*/
             fds[*count] = anetTcp6Server(server.neterr,port,NULL,
                 server.tcp_backlog);
             if (fds[*count] != ANET_ERR) {
@@ -1933,7 +1933,7 @@ int listenToPort(int port, int *fds, int *count) {
                 serverLog(LL_WARNING,"Not listening to IPv6: unsupproted");
             }
 
-            if (*count == 1 || unsupported) {
+            if (*count == 1 || unsupported) {//在ip v4上绑定
                 /* Bind the IPv4 address as well. */
                 fds[*count] = anetTcpServer(server.neterr,port,NULL,
                     server.tcp_backlog);
@@ -1945,11 +1945,11 @@ int listenToPort(int port, int *fds, int *count) {
                     serverLog(LL_WARNING,"Not listening to IPv4: unsupproted");
                 }
             }
-            /* Exit the loop if we were able to bind * on IPv4 and IPv6,
+            /* Exit the loop if we were able to bind * on IPv4 and IPv6, 如果在IPV4和V6上都绑定了,退出循环
              * otherwise fds[*count] will be ANET_ERR and we'll print an
              * error and return to the caller with an error. */
             if (*count + unsupported == 2) break;
-        } else if (strchr(server.bindaddr[j],':')) {
+        } else if (strchr(server.bindaddr[j],':')) {//ipv6
             /* Bind IPv6 address. */
             fds[*count] = anetTcp6Server(server.neterr,port,server.bindaddr[j],
                 server.tcp_backlog);
@@ -1969,7 +1969,7 @@ int listenToPort(int port, int *fds, int *count) {
                     continue;
             return C_ERR;
         }
-        anetNonBlock(NULL,fds[*count]);
+        anetNonBlock(NULL,fds[*count]);//设置fd为非阻塞
         (*count)++;
     }
     return C_OK;
@@ -2125,7 +2125,7 @@ void initServer(void) {
     /* Create the timer callback, this is our way to process many background
      * operations incrementally, like clients timeout, eviction of unaccessed
      * expired keys and so forth. */
-    if (aeCreateTimeEvent(server.el, 1, serverCron, NULL, NULL) == AE_ERR) {
+    if (aeCreateTimeEvent(server.el, 1, serverCron, NULL, NULL) == AE_ERR) {//初次执行延迟1毫秒
         serverPanic("Can't create event loop timers.");
         exit(1);
     }
@@ -2174,7 +2174,7 @@ void initServer(void) {
         server.maxmemory_policy = MAXMEMORY_NO_EVICTION;
     }
 
-    if (server.cluster_enabled) clusterInit();
+    if (server.cluster_enabled) clusterInit();  //如果启用集群,集群初始化
     replicationScriptCacheInit();
     scriptingInit(1);
     slowlogInit();
@@ -2380,8 +2380,8 @@ void preventCommandReplication(client *c) {
  *
  * The following flags can be passed:
  * CMD_CALL_NONE        No flags.
- * CMD_CALL_SLOWLOG     Check command speed and log in the slow log if needed.
- * CMD_CALL_STATS       Populate command stats.
+ * CMD_CALL_SLOWLOG     Check command speed and log in the slow log if needed. 在需要情况下记录到slowlog
+ * CMD_CALL_STATS       Populate command stats.  填充到命令统计
  * CMD_CALL_PROPAGATE_AOF   Append command to AOF if it modified the dataset
  *                          or if the client flags are forcing propagation.
  * CMD_CALL_PROPAGATE_REPL  Send command to salves if it modified the dataset
@@ -2488,9 +2488,9 @@ void call(client *c, int flags) {
         if (c->flags & CLIENT_FORCE_AOF) propagate_flags |= PROPAGATE_AOF;
 
         /* However prevent AOF / replication propagation if the command
-         * implementations called preventCommandPropagation() or similar,
+         * implementations called preventCommandPropagation() or similar,  如果命令实现调用过 preventCommandPropagation
          * or if we don't have the call() flags to do so. */
-        if (c->flags & CLIENT_PREVENT_REPL_PROP ||
+        if (c->flags & CLIENT_PREVENT_REPL_PROP ||  //满足其中之一,组织传播
             !(flags & CMD_CALL_PROPAGATE_REPL))
                 propagate_flags &= ~PROPAGATE_REPL;
         if (c->flags & CLIENT_PREVENT_AOF_PROP ||
@@ -2537,9 +2537,9 @@ void call(client *c, int flags) {
 /* If this function gets called we already read a whole
  * command, arguments are in the client argv/argc fields.
  * processCommand() execute the command or prepare the
- * server for a bulk read from the client.
+ * server for a bulk read from the client.    在我们读取到整个命令后该方法被调用
  *
- * If C_OK is returned the client is still alive and valid and
+ * If C_OK is returned the client is still alive and valid and  如果返回C_OK,client仍人活着且有效的
  * other operations can be performed by the caller. Otherwise
  * if C_ERR is returned the client was destroyed (i.e. after QUIT). */
 int processCommand(client *c) {
@@ -2558,7 +2558,7 @@ int processCommand(client *c) {
     /* Now lookup the command and check ASAP about trivial error conditions
      * such as wrong arity, bad command name and so forth. */
     c->cmd = c->lastcmd = lookupCommand(c->argv[0]->ptr);
-    if (!c->cmd) {
+    if (!c->cmd) {//如果没找到该命令
         flagTransaction(c);
         sds args = sdsempty();
         int i;
@@ -2569,15 +2569,15 @@ int processCommand(client *c) {
         sdsfree(args);
         return C_OK;
     } else if ((c->cmd->arity > 0 && c->cmd->arity != c->argc) ||
-               (c->argc < -c->cmd->arity)) {
+               (c->argc < -c->cmd->arity)) {//如果参数不相等   或者 小于最小参数
         flagTransaction(c);
         addReplyErrorFormat(c,"wrong number of arguments for '%s' command",
             c->cmd->name);
         return C_OK;
     }
 
-    /* Check if the user is authenticated */
-    if (server.requirepass && !c->authenticated && c->cmd->proc != authCommand)
+    /* Check if the user is authenticated 未认证 AUTH */
+    if (server.requirepass && !c->authenticated && c->cmd->proc != authCommand) //不是授权命令
     {
         flagTransaction(c);
         addReply(c,shared.noautherr);
@@ -2585,11 +2585,11 @@ int processCommand(client *c) {
     }
 
     /* If cluster is enabled perform the cluster redirection here.
-     * However we don't perform the redirection if:
-     * 1) The sender of this command is our master.
-     * 2) The command has no key arguments. */
+     * However we don't perform the redirection if:  如果启用了集群,执行重定向了,除了
+     * 1) The sender of this command is our master.  发送者是master
+     * 2) The command has no key arguments.  command 没有key arguments */
     if (server.cluster_enabled &&
-        !(c->flags & CLIENT_MASTER) &&
+        !(c->flags & CLIENT_MASTER) &&  //不是master
         !(c->flags & CLIENT_LUA &&
           server.lua_caller->flags & CLIENT_MASTER) &&
         !(c->cmd->getkeys_proc == NULL && c->cmd->firstkey == 0 &&
@@ -2605,18 +2605,18 @@ int processCommand(client *c) {
             } else {
                 flagTransaction(c);
             }
-            clusterRedirectClient(c,n,hashslot,error_code);
+            clusterRedirectClient(c,n,hashslot,error_code);//重定向交易结果
             return C_OK;
         }
     }
 
-    /* Handle the maxmemory directive.
+    /* Handle the maxmemory directive.  处理maxmemory指令
      *
      * Note that we do not want to reclaim memory if we are here re-entering
      * the event loop since there is a busy Lua script running in timeout
      * condition, to avoid mixing the propagation of scripts with the
      * propagation of DELs due to eviction. */
-    if (server.maxmemory && !server.lua_timedout) {
+    if (server.maxmemory && !server.lua_timedout) {//最大可用内存
         int out_of_memory = freeMemoryIfNeededAndSafe() == C_ERR;
         /* freeMemoryIfNeeded may flush slave output buffers. This may result
          * into a slave, that may be the active client, to be freed. */
@@ -2676,7 +2676,7 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* Only allow SUBSCRIBE and UNSUBSCRIBE in the context of Pub/Sub */
+    /* Only allow SUBSCRIBE and UNSUBSCRIBE in the context of Pub/Sub 在 Pub/Sub上下文下,只允许SUBSCRIBE and UNSUBSCRIBE*/
     if (c->flags & CLIENT_PUBSUB &&
         c->cmd->proc != pingCommand &&
         c->cmd->proc != subscribeCommand &&
@@ -2741,7 +2741,7 @@ int processCommand(client *c) {
 /*================================== Shutdown =============================== */
 
 /* Close listening sockets. Also unlink the unix domain socket if
- * unlink_unix_socket is non-zero. */
+ * unlink_unix_socket is non-zero. 关闭正在监听的socket*/
 void closeListeningSockets(int unlink_unix_socket) {
     int j;
 

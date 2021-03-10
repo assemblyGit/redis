@@ -46,7 +46,7 @@ static int aeApiCreate(aeEventLoop *eventLoop) {
         return -1;
     }
     state->epfd = epoll_create(1024); /* 1024 is just a hint for the kernel */
-    if (state->epfd == -1) {
+    if (state->epfd == -1) {//默认水平触发
         zfree(state->events);
         zfree(state);
         return -1;

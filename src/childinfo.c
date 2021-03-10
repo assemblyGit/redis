@@ -34,7 +34,7 @@
  * RDB / AOF saving process from the child to the parent (for instance
  * the amount of copy on write memory used) */
 void openChildInfoPipe(void) {
-    if (pipe(server.child_info_pipe) == -1) {
+    if (pipe(server.child_info_pipe) == -1) {//创建管道
         /* On error our two file descriptors should be still set to -1,
          * but we call anyway cloesChildInfoPipe() since can't hurt. */
         closeChildInfoPipe();
@@ -62,7 +62,7 @@ void closeChildInfoPipe(void) {
 void sendChildInfo(int ptype) {
     if (server.child_info_pipe[1] == -1) return;
     server.child_info_data.magic = CHILD_INFO_MAGIC;
-    server.child_info_data.process_type = ptype;
+    server.child_info_data.process_type = ptype;//子进程类型
     ssize_t wlen = sizeof(server.child_info_data);
     if (write(server.child_info_pipe[1],&server.child_info_data,wlen) != wlen) {
         /* Nothing to do on error, this will be detected by the other side. */

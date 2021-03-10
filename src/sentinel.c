@@ -661,7 +661,7 @@ void sentinelEvent(int level, char *type, sentinelRedisInstance *ri,
 /* This function is called only at startup and is used to generate a
  * +monitor event for every configured master. The same events are also
  * generated when a master to monitor is added at runtime via the
- * SENTINEL MONITOR command. */
+ * SENTINEL MONITOR command. 在启动时被调用,用来为每个配置的master产生 +monitor 事件*/
 void sentinelGenerateInitialMonitorEvents(void) {
     dictIterator *di;
     dictEntry *de;

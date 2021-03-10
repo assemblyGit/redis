@@ -43,7 +43,7 @@ struct latencySample {
     uint32_t latency; /* Latency in milliseconds. */
 };
 
-/* The latency time series for a given event. */
+/* The latency time series for a given event. 给定事件的latency事件序列*/
 struct latencyTimeSeries {
     int idx; /* Index of the next sample to store. */
     uint32_t max; /* Max latency observed for this event. */

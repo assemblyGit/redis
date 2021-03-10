@@ -717,13 +717,13 @@ sds sdstrim(sds s, const char *cset) {
 }
 
 /* Turn the string into a smaller (or equal) string containing only the
- * substring specified by the 'start' and 'end' indexes.
+ * substring specified by the 'start' and 'end' indexes.   将字符串截取为包含从开始到结束的子串
  *
  * start and end can be negative, where -1 means the last character of the
- * string, -2 the penultimate character, and so forth.
+ * string, -2 the penultimate character, and so forth. start可为负数,-1 表示string的最后一个字符,-2 表示倒数第二个字符
  *
  * The interval is inclusive, so the start and end characters will be part
- * of the resulting string.
+ * of the resulting string. 区间包含,所以开始和结束会是结果字符串的一部分
  *
  * The string is modified in-place.
  *
@@ -963,13 +963,13 @@ sds *sdssplitargs(const char *line, int *argc) {
         while(*p && isspace(*p)) p++;
         if (*p) {
             /* get a token */
-            int inq=0;  /* set to 1 if we are in "quotes" */
+            int inq=0;  /* set to 1 if we are in "quotes" 如果在双引号内*/
             int insq=0; /* set to 1 if we are in 'single quotes' */
             int done=0;
 
             if (current == NULL) current = sdsempty();
             while(!done) {
-                if (inq) {
+                if (inq) {//如果是16进制
                     if (*p == '\\' && *(p+1) == 'x' &&
                                              is_hex_digit(*(p+2)) &&
                                              is_hex_digit(*(p+3)))

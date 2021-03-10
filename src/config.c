@@ -345,7 +345,7 @@ void loadServerConfigFromString(char *config) {
                 goto loaderr;
             }
         } else if ((!strcasecmp(argv[0],"slaveof") ||
-                    !strcasecmp(argv[0],"replicaof")) && argc == 3) {
+                    !strcasecmp(argv[0],"replicaof")) && argc == 3) {//如果是slaveof或者replicaof
             slaveof_linenum = linenum;
             server.masterhost = sdsnew(argv[1]);
             server.masterport = atoi(argv[2]);
@@ -827,7 +827,7 @@ loaderr:
 /* Load the server configuration from the specified filename.
  * The function appends the additional configuration directives stored
  * in the 'options' string to the config file before loading.
- *
+ *     从指定文件加载server configuration
  * Both filename and options can be NULL, in such a case are considered
  * empty. This way loadServerConfig can be used to just load a file or
  * just load a string. */

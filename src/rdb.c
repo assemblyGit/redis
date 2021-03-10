@@ -1278,7 +1278,7 @@ werr:
     unlink(tmpfile);
     return C_ERR;
 }
-
+/**子进程保存文件*/
 int rdbSaveBackground(char *filename, rdbSaveInfo *rsi) {
     pid_t childpid;
     long long start;
@@ -1290,14 +1290,14 @@ int rdbSaveBackground(char *filename, rdbSaveInfo *rsi) {
     openChildInfoPipe();
 
     start = ustime();
-    if ((childpid = fork()) == 0) {
+    if ((childpid = fork()) == 0) {//fork子进程
         int retval;
 
         /* Child */
         closeListeningSockets(0);
         redisSetProcTitle("redis-rdb-bgsave");
         retval = rdbSave(filename,rsi);
-        if (retval == C_OK) {
+        if (retval == C_OK) {//保存文件成功
             size_t private_dirty = zmalloc_get_private_dirty(-1);
 
             if (private_dirty) {
@@ -1326,7 +1326,7 @@ int rdbSaveBackground(char *filename, rdbSaveInfo *rsi) {
         server.rdb_save_time_start = time(NULL);
         server.rdb_child_pid = childpid;
         server.rdb_child_type = RDB_CHILD_TYPE_DISK;
-        updateDictResizePolicy();
+        updateDictResizePolicy();//不允许resize
         return C_OK;
     }
     return C_OK; /* unreached */
@@ -2081,7 +2081,7 @@ int rdbLoad(char *filename, rdbSaveInfo *rsi) {
 }
 
 /* A background saving child (BGSAVE) terminated its work. Handle this.
- * This function covers the case of actual BGSAVEs. */
+ * This function covers the case of actual BGSAVEs. bgsave结束之后,该函数处理basave的实际情况*/
 void backgroundSaveDoneHandlerDisk(int exitcode, int bysignal) {
     if (!bysignal && exitcode == 0) {
         serverLog(LL_NOTICE,
@@ -2092,7 +2092,7 @@ void backgroundSaveDoneHandlerDisk(int exitcode, int bysignal) {
     } else if (!bysignal && exitcode != 0) {
         serverLog(LL_WARNING, "Background saving error");
         server.lastbgsave_status = C_ERR;
-    } else {
+    } else {//bysignal =true
         mstime_t latency;
 
         serverLog(LL_WARNING,
@@ -2111,7 +2111,7 @@ void backgroundSaveDoneHandlerDisk(int exitcode, int bysignal) {
     server.rdb_save_time_last = time(NULL)-server.rdb_save_time_start;
     server.rdb_save_time_start = -1;
     /* Possibly there are slaves waiting for a BGSAVE in order to be served
-     * (the first stage of SYNC is a bulk transfer of dump.rdb) */
+     * (the first stage of SYNC is a bulk transfer of dump.rdb) 有slave等待BGSAVE 为了处理 SYNC的第一阶段bulk transfer*/
     updateSlavesWaitingBgsave((!bysignal && exitcode == 0) ? C_OK : C_ERR, RDB_CHILD_TYPE_DISK);
 }
 
@@ -2210,7 +2210,7 @@ void backgroundSaveDoneHandlerSocket(int exitcode, int bysignal) {
     updateSlavesWaitingBgsave((!bysignal && exitcode == 0) ? C_OK : C_ERR, RDB_CHILD_TYPE_SOCKET);
 }
 
-/* When a background RDB saving/transfer terminates, call the right handler. */
+/* When a background RDB saving/transfer terminates, call the right handler. 当rdb文件写入成功*/
 void backgroundSaveDoneHandler(int exitcode, int bysignal) {
     switch(server.rdb_child_type) {
     case RDB_CHILD_TYPE_DISK:

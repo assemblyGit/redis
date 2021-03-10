@@ -143,7 +143,7 @@ int dictResize(dict *d)
     return dictExpand(d, minimal);
 }
 
-/* Expand or create the hash table */
+/* Expand or create the hash table 扩展hash table*/
 int dictExpand(dict *d, unsigned long size)
 {
     /* the size is invalid if it is smaller than the number of
@@ -258,7 +258,7 @@ int dictRehashMilliseconds(dict *d, int ms) {
  * dictionary so that the hash table automatically migrates from H1 to H2
  * while it is actively used. */
 static void _dictRehashStep(dict *d) {
-    if (d->iterators == 0) dictRehash(d,1);
+    if (d->iterators == 0) dictRehash(d,1);//
 }
 
 /* Add an element to the target hash table */
@@ -306,7 +306,7 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
      * Insert the element in top, with the assumption that in a database
      * system it is more likely that recently added entries are accessed
      * more frequently. */
-    ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
+    ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];//如果在rehash
     entry = zmalloc(sizeof(*entry));
     entry->next = ht->table[index];
     ht->table[index] = entry;
@@ -606,7 +606,7 @@ void dictReleaseIterator(dictIterator *iter)
 }
 
 /* Return a random entry from the hash table. Useful to
- * implement randomized algorithms */
+ * implement randomized algorithms 从hash table返回随机entry */
 dictEntry *dictGetRandomKey(dict *d)
 {
     dictEntry *he, *orighe;
@@ -614,16 +614,16 @@ dictEntry *dictGetRandomKey(dict *d)
     int listlen, listele;
 
     if (dictSize(d) == 0) return NULL;
-    if (dictIsRehashing(d)) _dictRehashStep(d);
-    if (dictIsRehashing(d)) {
+    if (dictIsRehashing(d)) _dictRehashStep(d);//如果正在rehash,执行一步rehash
+    if (dictIsRehashing(d)) {//如果正在rehash
         do {
             /* We are sure there are no elements in indexes from 0
              * to rehashidx-1 */
             h = d->rehashidx + (random() % (d->ht[0].size +
                                             d->ht[1].size -
-                                            d->rehashidx));
+                                            d->rehashidx));//渐进式rehash  d->ht[0].size-d->rehashidx = 表0的数量
             he = (h >= d->ht[0].size) ? d->ht[1].table[h - d->ht[0].size] :
-                                      d->ht[0].table[h];
+                                      d->ht[0].table[h];//确定随机结果在哪张表
         } while(he == NULL);
     } else {
         do {
@@ -635,14 +635,14 @@ dictEntry *dictGetRandomKey(dict *d)
     /* Now we found a non empty bucket, but it is a linked
      * list and we need to get a random element from the list.
      * The only sane way to do so is counting the elements and
-     * select a random index. */
+     * select a random index. 找到一个非空的桶,从linklist中随机找到一个*/
     listlen = 0;
     orighe = he;
-    while(he) {
+    while(he) {//计算链表长度
         he = he->next;
         listlen++;
     }
-    listele = random() % listlen;
+    listele = random() % listlen;//hash bucket的链表的某个元素
     he = orighe;
     while(listele--) he = he->next;
     return he;
